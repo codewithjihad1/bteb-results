@@ -2,14 +2,33 @@
 
 A comprehensive REST API for managing and querying BTEB (Bangladesh Technical Education Board) examination results.
 
-## 🚀 Features
+## ✨ NEW: Multi-Semester & Multi-Regulation Support
 
--   **Individual Result Search**: Find student results by roll number
+The system now supports **multiple semesters (3rd-8th)** and **multiple regulations (2016, 2022)**!
+
+-   🎯 Query results by specific semester and regulation
+-   📊 Track student progress across semesters
+-   🔍 Dynamic PDF detection and parsing
+-   📈 Semester-specific statistics and analytics
+
+See [API_UPDATED.md](docs/API_UPDATED.md) for complete documentation.
+
+## 🚀 Deployment
+
+### Important: Migration Required
+
+If upgrading from an older version, please follow the [MIGRATION_GUIDE.md](MIGRATION_GUIDE.md) to update your database schema.
+
+-   **Multi-Semester Support**: Handle results from 3rd to 8th semester
+-   **Multi-Regulation Support**: Support for 2016 and 2022 regulations
+-   **Individual Result Search**: Find student results by roll number with optional semester/regulation filters
 -   **Institute-wise Results**: View all results for a specific institute
--   **Advanced Filtering**: Search by status, GPA range, institute, etc.
--   **Statistics**: Get comprehensive statistics for students and institutes
+-   **Advanced Filtering**: Search by status, GPA range, institute, semester, regulation, etc.
+-   **Statistics**: Get comprehensive statistics filtered by semester and regulation
 -   **Top Performers**: View rankings and top-performing students/institutes
--   **PDF Import**: Automatically parse and import results from PDF files
+-   **PDF Import**: Automatically parse and import results from multiple PDF files
+-   **Progress Tracking**: View student performance across multiple semesters
+-   **PDF Discovery**: API endpoint to list all available PDF files
 
 ## 📋 Prerequisites
 
@@ -50,7 +69,11 @@ NODE_ENV=development
 6. Import data from PDF:
 
 ```bash
+# Import all available PDFs
 node scripts/importData.js
+
+# Or import specific semester via API (after server is running)
+# POST http://localhost:5000/api/students/import-from-pdf?semester=5&regulation=2022
 ```
 
 7. Start the server:
@@ -65,24 +88,48 @@ npm start
 
 ## 📚 API Endpoints
 
+> 📖 **For complete API documentation with multi-semester/regulation support, see [API_UPDATED.md](docs/API_UPDATED.md)**
+
+### Quick Start Examples
+
+#### Get Available PDFs
+
+```http
+GET /api/students/pdfs/available
+```
+
+#### Import Specific Semester
+
+```http
+POST /api/students/import-from-pdf?semester=5&regulation=2022
+```
+
 ### Students
 
 #### Get Student by Roll Number
 
 ```http
+# Get all semesters for a student
 GET /api/students/roll/:rollNumber
+
+# Get specific semester
+GET /api/students/roll/:rollNumber?semester=6&regulation=2022
 ```
 
 **Example:**
 
 ```bash
+# All semesters
 curl http://localhost:5000/api/students/roll/190002
+
+# Specific semester
+curl "http://localhost:5000/api/students/roll/190002?semester=6&regulation=2022"
 ```
 
 #### Search Students
 
 ```http
-GET /api/students/search?rollNumber=190&status=PASSED&minGpa=3.0
+GET /api/students/search?semester=5&regulation=2022&status=PASSED&minGpa=3.0
 ```
 
 **Query Parameters:**
@@ -91,6 +138,8 @@ GET /api/students/search?rollNumber=190&status=PASSED&minGpa=3.0
 -   `instituteCode`: Filter by institute code
 -   `instituteName`: Filter by institute name
 -   `status`: PASSED | REFERRED | WITHHELD | ABSENT
+-   `semester`: Semester number (3-8) 🆕
+-   `regulation`: Regulation year ("2016" or "2022") 🆕
 -   `minGpa`: Minimum GPA (0-4)
 -   `maxGpa`: Maximum GPA (0-4)
 -   `page`: Page number (default: 1)
@@ -117,7 +166,11 @@ GET /api/students/status/PASSED?page=1&limit=20
 #### Get Student Statistics
 
 ```http
+# Overall statistics
 GET /api/students/stats/overview
+
+# Statistics for specific semester
+GET /api/students/stats/overview?semester=5&regulation=2022
 ```
 
 ### Institutes
@@ -217,8 +270,8 @@ GET /api/institutes/top-performers?limit=10
   rollNumber: String,
   instituteCode: String,
   instituteName: String,
-  semester: Number,
-  regulation: String,
+  semester: Number, // 3-8 🆕
+  regulation: String, // "2016" or "2022" 🆕
   examYear: Number,
   status: String, // PASSED | REFERRED | WITHHELD | ABSENT
   gpaData: {
@@ -227,7 +280,9 @@ GET /api/institutes/top-performers?limit=10
     gpa3: Number,
     gpa4: Number,
     gpa5: Number,
-    gpa6: Number
+    gpa6: Number,
+    gpa7: Number, // 🆕
+    gpa8: Number  // 🆕
   },
   referredSubjects: [{
     subjectCode: String,
@@ -236,6 +291,8 @@ GET /api/institutes/top-performers?limit=10
   passedAllSubjects: Boolean
 }
 ```
+
+**Note**: Unique constraint is on combination of `rollNumber`, `semester`, and `regulation`.
 
 ### Institute Model
 
@@ -273,7 +330,23 @@ GET /api/institutes/top-performers?limit=10
 | NODE_ENV    | Environment mode          | development                            |
 | CORS_ORIGIN | CORS allowed origin       | \*                                     |
 
-## 🚀 Deployment
+## � Documentation
+
+-   **[API_UPDATED.md](docs/API_UPDATED.md)** - Complete API documentation with multi-semester support
+-   **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - Guide for migrating from single to multi-semester system
+-   **[UPDATE_SUMMARY.md](UPDATE_SUMMARY.md)** - Summary of recent changes and updates
+
+## 🧪 Testing
+
+Run the test suite to verify multi-semester functionality:
+
+```bash
+# Make sure the server is running first
+npm run dev
+
+# In another terminal, run the test script
+node test_multi_semester.js
+```
 
 ### Docker
 

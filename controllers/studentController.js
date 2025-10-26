@@ -15,9 +15,14 @@ exports.getStudentFromPDF = async (req, res) => {
         }
 
         const { rollNumber } = req.params;
+        const { semester, regulation } = req.query;
 
         // Check if student already exists in database
-        let student = await Student.findByRollNumber(rollNumber);
+        let student = await Student.findByRollNumber(
+            rollNumber,
+            semester,
+            regulation
+        );
 
         if (student) {
             return res.status(200).json({
@@ -28,14 +33,27 @@ exports.getStudentFromPDF = async (req, res) => {
             });
         }
 
-        // If not in database, parse PDF
-        const pdfPath = path.join(
-            __dirname,
-            "../data/RESULT_6th_2022_Regulation.pdf"
-        );
+        // Determine PDF path based on parameters
+        const pdfFileName = this.determinePDFFileName(semester, regulation);
+        const pdfPath = path.join(__dirname, "../data", pdfFileName);
+
+        // Check if PDF file exists
+        const fs = require("fs");
+        if (!fs.existsSync(pdfPath)) {
+            return res.status(404).json({
+                success: false,
+                message: `PDF file not found for semester ${
+                    semester || "N/A"
+                }, regulation ${regulation || "N/A"}`,
+                pdfFileName,
+            });
+        }
+
         const parser = new BTEBResultParser();
 
-        console.log(`Parsing PDF for roll number: ${rollNumber}`);
+        console.log(
+            `Parsing PDF: ${pdfFileName} for roll number: ${rollNumber}`
+        );
         const { students, institutes } = await parser.parsePDF(pdfPath);
 
         // Find the specific student in parsed data
@@ -71,16 +89,48 @@ exports.getStudentFromPDF = async (req, res) => {
     }
 };
 
+// Helper function to determine PDF filename
+exports.determinePDFFileName = (semester, regulation) => {
+    const sem = semester || "1";
+    const reg = regulation || "2022";
+
+    // Convert semester number to ordinal
+    const ordinals = {
+        1: "1st",
+        2: "2nd",
+        3: "3rd",
+        4: "4th",
+        5: "5th",
+        6: "6th",
+        7: "7th",
+        8: "8th",
+    };
+    const semesterOrdinal = ordinals[sem] || `${sem}th`;
+
+    return `RESULT_${semesterOrdinal}_${reg}_Regulation.pdf`;
+};
+
 // Batch import all students from PDF to MongoDB
 exports.importAllStudentsFromPDF = async (req, res) => {
     try {
-        const pdfPath = path.join(
-            __dirname,
-            "../data/RESULT_6th_2022_Regulation.pdf"
-        );
+        const { semester, regulation } = req.body;
+
+        // Determine PDF path
+        const pdfFileName = exports.determinePDFFileName(semester, regulation);
+        const pdfPath = path.join(__dirname, "../data", pdfFileName);
+
+        // Check if PDF file exists
+        const fs = require("fs");
+        if (!fs.existsSync(pdfPath)) {
+            return res.status(404).json({
+                success: false,
+                message: `PDF file not found: ${pdfFileName}`,
+            });
+        }
+
         const parser = new BTEBResultParser();
 
-        console.log("Starting batch import from PDF...");
+        console.log(`Starting batch import from PDF: ${pdfFileName}...`);
         const { students, institutes } = await parser.parsePDF(pdfPath);
 
         console.log(`Found ${students.length} students in PDF`);
@@ -88,7 +138,11 @@ exports.importAllStudentsFromPDF = async (req, res) => {
         // Use bulkWrite for efficient insertion with upsert
         const operations = students.map((student) => ({
             updateOne: {
-                filter: { rollNumber: student.rollNumber },
+                filter: {
+                    rollNumber: student.rollNumber,
+                    semester: student.semester,
+                    regulation: student.regulation,
+                },
                 update: { $set: student },
                 upsert: true,
             },
@@ -103,6 +157,7 @@ exports.importAllStudentsFromPDF = async (req, res) => {
         res.status(200).json({
             success: true,
             message: "Batch import completed successfully",
+            pdfFile: pdfFileName,
             statistics: {
                 totalStudentsInPDF: students.length,
                 inserted: result.upsertedCount,
@@ -132,13 +187,29 @@ exports.getStudentByRoll = async (req, res) => {
         }
 
         const { rollNumber } = req.params;
+        const { semester, regulation } = req.query;
 
-        const student = await Student.findByRollNumber(rollNumber);
+        const student = await Student.findByRollNumber(
+            rollNumber,
+            semester,
+            regulation
+        );
 
         if (!student) {
             return res.status(404).json({
                 success: false,
                 message: "Student not found with this roll number",
+                filters: { rollNumber, semester, regulation },
+            });
+        }
+
+        // If no specific semester/regulation provided, return all results for this roll
+        if (!semester && !regulation && Array.isArray(student)) {
+            return res.status(200).json({
+                success: true,
+                message: "Multiple results found for this roll number",
+                count: student.length,
+                data: student,
             });
         }
 
@@ -172,6 +243,8 @@ exports.searchStudents = async (req, res) => {
             instituteCode,
             instituteName,
             status,
+            semester,
+            regulation,
             minGpa,
             maxGpa,
             page = 1,
@@ -197,16 +270,28 @@ exports.searchStudents = async (req, res) => {
             query.status = status;
         }
 
+        if (semester) {
+            query.semester = parseInt(semester);
+        }
+
+        if (regulation) {
+            query.regulation = regulation;
+        }
+
+        // Dynamic GPA filtering based on semester
         if (minGpa || maxGpa) {
-            query["gpaData.gpa6"] = {};
-            if (minGpa) query["gpaData.gpa6"].$gte = parseFloat(minGpa);
-            if (maxGpa) query["gpaData.gpa6"].$lte = parseFloat(maxGpa);
+            const gpaField = semester ? `gpaData.gpa${semester}` : "cgpa";
+            query[gpaField] = {};
+            if (minGpa) query[gpaField].$gte = parseFloat(minGpa);
+            if (maxGpa) query[gpaField].$lte = parseFloat(maxGpa);
         }
 
         const skip = (page - 1) * limit;
 
+        // Sort by semester-specific GPA or CGPA
+        const sortField = semester ? `gpaData.gpa${semester}` : "cgpa";
         const students = await Student.find(query)
-            .sort({ "gpaData.gpa6": -1 })
+            .sort({ [sortField]: -1 })
             .skip(skip)
             .limit(parseInt(limit))
             .lean();
@@ -222,6 +307,7 @@ exports.searchStudents = async (req, res) => {
                 totalRecords: total,
                 limit: parseInt(limit),
             },
+            filters: { semester, regulation, status, instituteCode },
         });
     } catch (error) {
         console.error("Error in searchStudents:", error);
@@ -348,25 +434,37 @@ exports.getStudentsByStatus = async (req, res) => {
 // Get student statistics
 exports.getStudentStatistics = async (req, res) => {
     try {
-        const totalStudents = await Student.countDocuments();
+        const { semester, regulation } = req.query;
+        const query = {};
+
+        if (semester) query.semester = parseInt(semester);
+        if (regulation) query.regulation = regulation;
+
+        const totalStudents = await Student.countDocuments(query);
         const passedStudents = await Student.countDocuments({
+            ...query,
             status: "PASSED",
         });
         const referredStudents = await Student.countDocuments({
+            ...query,
             status: "REFERRED",
         });
         const withheldStudents = await Student.countDocuments({
+            ...query,
             status: "WITHHELD",
         });
         const absentStudents = await Student.countDocuments({
+            ...query,
             status: "ABSENT",
         });
 
-        // Get GPA distribution
+        // Get GPA distribution for specific semester or overall
+        const gpaField = semester ? `gpaData.gpa${semester}` : "cgpa";
         const gpaDistribution = await Student.aggregate([
+            { $match: query },
             {
                 $bucket: {
-                    groupBy: "$gpaData.gpa6",
+                    groupBy: `$${gpaField}`,
                     boundaries: [0, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0],
                     default: "Other",
                     output: {
@@ -378,15 +476,17 @@ exports.getStudentStatistics = async (req, res) => {
 
         // Get average GPA
         const avgGpaResult = await Student.aggregate([
+            { $match: query },
             {
                 $group: {
                     _id: null,
-                    avgGpa: { $avg: "$gpaData.gpa6" },
+                    avgGpa: { $avg: `$${gpaField}` },
                 },
             },
         ]);
 
         const statistics = {
+            filters: { semester, regulation },
             total: totalStudents,
             passed: passedStudents,
             referred: referredStudents,
@@ -407,6 +507,46 @@ exports.getStudentStatistics = async (req, res) => {
         });
     } catch (error) {
         console.error("Error in getStudentStatistics:", error);
+        res.status(500).json({
+            success: false,
+            message: "Server error",
+            error: error.message,
+        });
+    }
+};
+
+// Get available PDF files and their metadata
+exports.getAvailablePDFs = async (req, res) => {
+    try {
+        const fs = require("fs");
+        const dataPath = path.join(__dirname, "../data");
+
+        // Read all PDF files in data directory
+        const files = fs
+            .readdirSync(dataPath)
+            .filter((file) => file.endsWith(".pdf"));
+
+        const pdfMetadata = files
+            .map((file) => {
+                const semesterMatch = file.match(/(\d)(?:st|nd|rd|th)/i);
+                const regulationMatch = file.match(/(\d{4})/);
+
+                return {
+                    fileName: file,
+                    semester: semesterMatch ? parseInt(semesterMatch[1]) : null,
+                    regulation: regulationMatch ? regulationMatch[1] : null,
+                    path: `/data/${file}`,
+                };
+            })
+            .filter((meta) => meta.semester && meta.regulation);
+
+        res.status(200).json({
+            success: true,
+            count: pdfMetadata.length,
+            data: pdfMetadata,
+        });
+    } catch (error) {
+        console.error("Error in getAvailablePDFs:", error);
         res.status(500).json({
             success: false,
             message: "Server error",

@@ -7,10 +7,26 @@ const pdfParse = require("pdf-parse");
 class BTEBResultParser {
     constructor() {
         this.institutePattern = /(\d{5})\s*-\s*(.+?)(?=\s+\d{6}|$)/;
-        this.passedPattern =
-            /(\d{6})\s*\(gpa6:\s*([\d.]+),\s*gpa5:\s*([\d.]+),\s*gpa4:\s*([\d.]+),\s*gpa3:\s*([\d.]+),\s*gpa2:\s*([\d.]+),\s*gpa1:\s*([\d.]+)\)/g;
-        this.referredPattern =
-            /(\d{6})\s*\{\s*gpa6:\s*([\d.ref]+),\s*gpa5:\s*([\d.ref]+),\s*gpa4:\s*([\d.ref]+),\s*gpa3:\s*([\d.ref]+),\s*gpa2:\s*([\d.ref]+),\s*gpa1:\s*([\d.ref]+),?\s*ref_sub:\s*([^}]+)\}/g;
+        // Dynamic patterns for all semesters (3rd to 8th)
+        this.passedPatterns = {
+            3: /(\d{6})\s*\(gpa3:\s*([\d.]+),\s*gpa2:\s*([\d.]+),\s*gpa1:\s*([\d.]+)\)/g,
+            4: /(\d{6})\s*\(gpa4:\s*([\d.]+),\s*gpa3:\s*([\d.]+),\s*gpa2:\s*([\d.]+),\s*gpa1:\s*([\d.]+)\)/g,
+            5: /(\d{6})\s*\(gpa5:\s*([\d.]+),\s*gpa4:\s*([\d.]+),\s*gpa3:\s*([\d.]+),\s*gpa2:\s*([\d.]+),\s*gpa1:\s*([\d.]+)\)/g,
+            6: /(\d{6})\s*\(gpa6:\s*([\d.]+),\s*gpa5:\s*([\d.]+),\s*gpa4:\s*([\d.]+),\s*gpa3:\s*([\d.]+),\s*gpa2:\s*([\d.]+),\s*gpa1:\s*([\d.]+)\)/g,
+            7: /(\d{6})\s*\(gpa7:\s*([\d.]+),\s*gpa6:\s*([\d.]+),\s*gpa5:\s*([\d.]+),\s*gpa4:\s*([\d.]+),\s*gpa3:\s*([\d.]+),\s*gpa2:\s*([\d.]+),\s*gpa1:\s*([\d.]+)\)/g,
+            8: /(\d{6})\s*\(gpa8:\s*([\d.]+),\s*gpa7:\s*([\d.]+),\s*gpa6:\s*([\d.]+),\s*gpa5:\s*([\d.]+),\s*gpa4:\s*([\d.]+),\s*gpa3:\s*([\d.]+),\s*gpa2:\s*([\d.]+),\s*gpa1:\s*([\d.]+)\)/g,
+        };
+        this.referredPatterns = {
+            3: /(\d{6})\s*\{\s*gpa3:\s*([\d.ref]+),\s*gpa2:\s*([\d.ref]+),\s*gpa1:\s*([\d.ref]+),?\s*ref_sub:\s*([^}]+)\}/g,
+            4: /(\d{6})\s*\{\s*gpa4:\s*([\d.ref]+),\s*gpa3:\s*([\d.ref]+),\s*gpa2:\s*([\d.ref]+),\s*gpa1:\s*([\d.ref]+),?\s*ref_sub:\s*([^}]+)\}/g,
+            5: /(\d{6})\s*\{\s*gpa5:\s*([\d.ref]+),\s*gpa4:\s*([\d.ref]+),\s*gpa3:\s*([\d.ref]+),\s*gpa2:\s*([\d.ref]+),\s*gpa1:\s*([\d.ref]+),?\s*ref_sub:\s*([^}]+)\}/g,
+            6: /(\d{6})\s*\{\s*gpa6:\s*([\d.ref]+),\s*gpa5:\s*([\d.ref]+),\s*gpa4:\s*([\d.ref]+),\s*gpa3:\s*([\d.ref]+),\s*gpa2:\s*([\d.ref]+),\s*gpa1:\s*([\d.ref]+),?\s*ref_sub:\s*([^}]+)\}/g,
+            7: /(\d{6})\s*\{\s*gpa7:\s*([\d.ref]+),\s*gpa6:\s*([\d.ref]+),\s*gpa5:\s*([\d.ref]+),\s*gpa4:\s*([\d.ref]+),\s*gpa3:\s*([\d.ref]+),\s*gpa2:\s*([\d.ref]+),\s*gpa1:\s*([\d.ref]+),?\s*ref_sub:\s*([^}]+)\}/g,
+            8: /(\d{6})\s*\{\s*gpa8:\s*([\d.ref]+),\s*gpa7:\s*([\d.ref]+),\s*gpa6:\s*([\d.ref]+),\s*gpa5:\s*([\d.ref]+),\s*gpa4:\s*([\d.ref]+),\s*gpa3:\s*([\d.ref]+),\s*gpa2:\s*([\d.ref]+),\s*gpa1:\s*([\d.ref]+),?\s*ref_sub:\s*([^}]+)\}/g,
+        };
+        // Patterns to detect semester and regulation from filename or content
+        this.semesterPattern = /(\d)(?:st|nd|rd|th)\s*Semester/i;
+        this.regulationPattern = /(\d{4})\s*Regulation/i;
     }
 
     /**
@@ -20,7 +36,11 @@ class BTEBResultParser {
         try {
             const dataBuffer = await fs.readFile(filePath);
             const data = await pdfParse(dataBuffer);
-            return this.extractStudentData(data.text);
+
+            // Extract semester and regulation from filename or content
+            const metadata = this.extractMetadata(filePath, data.text);
+
+            return this.extractStudentData(data.text, metadata);
         } catch (error) {
             console.error("Error parsing PDF:", error);
             throw error;
@@ -28,16 +48,77 @@ class BTEBResultParser {
     }
 
     /**
+     * Extract semester and regulation metadata from filename or PDF content
+     */
+    extractMetadata(filePath, text) {
+        const metadata = {
+            semester: null,
+            regulation: null,
+            examYear: 2024,
+        };
+
+        // Try to extract from filename first
+        const filename = filePath.split(/[/\\]/).pop();
+
+        // Extract semester from filename (e.g., RESULT_5th_2022_Regulation.pdf)
+        const semesterMatch = filename.match(/(\d)(?:st|nd|rd|th)/i);
+        if (semesterMatch) {
+            metadata.semester = parseInt(semesterMatch[1]);
+        }
+
+        // Extract regulation from filename
+        const regulationMatch = filename.match(/(\d{4})/);
+        if (regulationMatch) {
+            metadata.regulation = regulationMatch[1];
+        }
+
+        // If not found in filename, try content
+        if (!metadata.semester) {
+            const contentSemesterMatch = text.match(this.semesterPattern);
+            if (contentSemesterMatch) {
+                metadata.semester = parseInt(contentSemesterMatch[1]);
+            }
+        }
+
+        if (!metadata.regulation) {
+            const contentRegulationMatch = text.match(this.regulationPattern);
+            if (contentRegulationMatch) {
+                metadata.regulation = contentRegulationMatch[1];
+            }
+        }
+
+        // Default values if not detected
+        metadata.semester = metadata.semester || 6;
+        metadata.regulation = metadata.regulation || "2022";
+
+        console.log(
+            `Detected metadata - Semester: ${metadata.semester}, Regulation: ${metadata.regulation}`
+        );
+        return metadata;
+    }
+
+    /**
      * Extract student data from text
      */
-    extractStudentData(text) {
+    extractStudentData(text, metadata) {
         const students = [];
         const institutes = new Map();
 
         let currentInstitute = null;
+        const { semester, regulation, examYear } = metadata;
+
+        // Get the appropriate patterns for this semester
+        const passedPattern = this.passedPatterns[semester];
+        const referredPattern = this.referredPatterns[semester];
+
+        if (!passedPattern || !referredPattern) {
+            console.warn(
+                `No patterns defined for semester ${semester}, using defaults`
+            );
+            return { students: [], institutes: [] };
+        }
 
         // First, normalize the text by joining multi-line student records
-        // Remove extra whitespace and join lines that are part of the same record
         const normalizedText = this.normalizeText(text);
         const lines = normalizedText.split("\n");
 
@@ -63,37 +144,49 @@ class BTEBResultParser {
 
             // Match passed students
             let match;
-            this.passedPattern.lastIndex = 0; // Reset regex
-            while ((match = this.passedPattern.exec(line)) !== null) {
+            passedPattern.lastIndex = 0; // Reset regex
+            while ((match = passedPattern.exec(line)) !== null) {
                 if (currentInstitute) {
                     students.push(
                         this.createStudentObject(
                             match,
                             currentInstitute,
                             "PASSED",
-                            []
+                            [],
+                            semester,
+                            regulation,
+                            examYear
                         )
                     );
                 }
             }
 
             // Match referred students
-            this.referredPattern.lastIndex = 0; // Reset regex
-            while ((match = this.referredPattern.exec(line)) !== null) {
+            referredPattern.lastIndex = 0; // Reset regex
+            while ((match = referredPattern.exec(line)) !== null) {
                 if (currentInstitute) {
-                    const refSubjects = this.parseReferredSubjects(match[8]);
+                    const refSubjectIndex = semester + 2; // Position of ref_sub in match array
+                    const refSubjects = this.parseReferredSubjects(
+                        match[refSubjectIndex]
+                    );
                     students.push(
                         this.createStudentObject(
                             match,
                             currentInstitute,
                             "REFERRED",
-                            refSubjects
+                            refSubjects,
+                            semester,
+                            regulation,
+                            examYear
                         )
                     );
                 }
             }
         }
 
+        console.log(
+            `Extracted ${students.length} students for semester ${semester}, regulation ${regulation}`
+        );
         return {
             students,
             institutes: Array.from(institutes.values()),
@@ -154,29 +247,37 @@ class BTEBResultParser {
     /**
      * Create student object
      */
-    createStudentObject(match, institute, status, referredSubjects) {
+    createStudentObject(
+        match,
+        institute,
+        status,
+        referredSubjects,
+        semester,
+        regulation,
+        examYear
+    ) {
         const parseGpa = (value) => {
             if (!value || value === "ref") return null;
             const parsed = parseFloat(value);
             return isNaN(parsed) ? null : parsed;
         };
 
+        // Build GPA data dynamically based on semester
+        const gpaData = {};
+        for (let i = 1; i <= semester; i++) {
+            const gpaValue = match[semester - i + 2]; // GPAs are in reverse order in match
+            gpaData[`gpa${i}`] = parseGpa(gpaValue);
+        }
+
         return {
             rollNumber: match[1],
             instituteCode: institute.code,
             instituteName: institute.name,
-            semester: 6,
-            regulation: "2022",
-            examYear: 2024,
+            semester,
+            regulation,
+            examYear,
             status,
-            gpaData: {
-                gpa6: parseGpa(match[2]),
-                gpa5: parseGpa(match[3]),
-                gpa4: parseGpa(match[4]),
-                gpa3: parseGpa(match[5]),
-                gpa2: parseGpa(match[6]),
-                gpa1: parseGpa(match[7]),
-            },
+            gpaData,
             referredSubjects,
             passedAllSubjects: status === "PASSED",
         };
