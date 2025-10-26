@@ -1,0 +1,207 @@
+{
+    "info": {
+        "name": "BTEB Result Management API",
+        "description": "API collection for BTEB Result Management System",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Students",
+            "item": [
+                {
+                    "name": "Get Student by Roll Number",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/students/roll/190002",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "students", "roll", "190002" ]
+                        }
+                    }
+                },
+                {
+                    "name": "Search Students",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/students/search?status=PASSED&minGpa=3.5&limit=10",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "students", "search" ],
+                            "query": [
+                                { "key": "status", "value": "PASSED" },
+                                { "key": "minGpa", "value": "3.5" },
+                                { "key": "limit", "value": "10" }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get All Students",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/students?page=1&limit=20",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "students" ],
+                            "query": [
+                                { "key": "page", "value": "1" },
+                                { "key": "limit", "value": "20" }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Top Performers",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/students/top-performers?limit=10",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "students", "top-performers" ],
+                            "query": [ { "key": "limit", "value": "10" } ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Students by Status",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/students/status/PASSED?page=1&limit=20",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "students", "status", "PASSED" ],
+                            "query": [
+                                { "key": "page", "value": "1" },
+                                { "key": "limit", "value": "20" }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Student Statistics",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/students/stats/overview",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "students", "stats", "overview" ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Institutes",
+            "item": [
+                {
+                    "name": "Get All Institutes",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/institutes?page=1&limit=20",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "institutes" ],
+                            "query": [
+                                { "key": "page", "value": "1" },
+                                { "key": "limit", "value": "20" }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Institute by Code",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/institutes/code/11044",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "institutes", "code", "11044" ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Institute Results",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/institutes/11044/results?status=PASSED&page=1&limit=20",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "institutes", "11044", "results" ],
+                            "query": [
+                                { "key": "status", "value": "PASSED" },
+                                { "key": "page", "value": "1" },
+                                { "key": "limit", "value": "20" }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Institute Statistics",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/institutes/11044/statistics",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "institutes", "11044", "statistics" ]
+                        }
+                    }
+                },
+                {
+                    "name": "Search Institutes",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/institutes/search?name=Polytechnic",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "institutes", "search" ],
+                            "query": [ { "key": "name", "value": "Polytechnic" } ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get Top Institutes",
+                    "request": {
+                        "method": "GET",
+                        "header": [ ],
+                        "url": {
+                            "raw": "{{baseUrl}}/api/institutes/top-performers?limit=10",
+                            "host": [ "{{baseUrl}}" ],
+                            "path": [ "api", "institutes", "top-performers" ],
+                            "query": [ { "key": "limit", "value": "10" } ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Health Check",
+            "request": {
+                "method": "GET",
+                "header": [ ],
+                "url": {
+                    "raw": "{{baseUrl}}/health",
+                    "host": [ "{{baseUrl}}" ],
+                    "path": [ "health" ]
+                }
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:5000",
+            "type": "string"
+        }
+    ]
+}

@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTEB Result API Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #667eea;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .search-section {
+            background: #f7f7f7;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input,
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-right: 10px;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background: #5568d3;
+        }
+
+        .result-section {
+            margin-top: 30px;
+        }
+
+        .result-card {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+        }
+
+        .result-card h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .gpa-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .gpa-item {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .gpa-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .gpa-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        .status-passed {
+            background: #10b981;
+            color: white;
+        }
+
+        .status-referred {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+
+        .error {
+            background: #fee;
+            border-left: 4px solid #f00;
+            padding: 15px;
+            border-radius: 5px;
+            color: #c00;
+        }
+
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🎓 BTEB Result Management System - API Test</h1>
+
+        <div class="search-section">
+            <h2>Search Student Result</h2>
+
+            <div class="input-group">
+                <label for="rollNumber">Roll Number:</label>
+                <input type="text" id="rollNumber" placeholder="Enter roll number (e.g., 190002)">
+            </div>
+
+            <button onclick="searchByRoll()">🔍 Search by Roll</button>
+            <button onclick="getTopPerformers()">🏆 Top Performers</button>
+            <button onclick="getStatistics()">📊 Statistics</button>
+            <button onclick="getAllInstitutes()">🏫 All Institutes</button>
+        </div>
+
+        <div class="search-section">
+            <h2>Advanced Search</h2>
+
+            <div class="input-group">
+                <label for="status">Status:</label>
+                <select id="status">
+                    <option value="">All</option>
+                    <option value="PASSED">Passed</option>
+                    <option value="REFERRED">Referred</option>
+                    <option value="WITHHELD">Withheld</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label for="minGpa">Minimum GPA:</label>
+                <input type="number" id="minGpa" placeholder="e.g., 3.0" step="0.01" min="0" max="4">
+            </div>
+
+            <div class="input-group">
+                <label for="instituteCode">Institute Code:</label>
+                <input type="text" id="instituteCode" placeholder="e.g., 11044">
+            </div>
+
+            <button onclick="advancedSearch()">🔍 Advanced Search</button>
+        </div>
+
+        <div id="result" class="result-section"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api';
+
+        function showLoading() {
+            document.getElementById('result').innerHTML = '<div class="loading">⏳ Loading...</div>';
+        }
+
+        function showError(message) {
+            document.getElementById('result').innerHTML = `<div class="error">❌ Error: ${message}</div>`;
+        }
+
+        function formatGPA(gpa) {
+            return gpa !== null && gpa !== undefined ? gpa.toFixed(2) : 'N/A';
+        }
+
+        async function searchByRoll() {
+            const rollNumber = document.getElementById('rollNumber').value.trim();
+
+            if (!rollNumber) {
+                showError('Please enter a roll number');
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const response = await fetch(`${API_BASE}/students/roll/${rollNumber}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showError(data.message);
+                    return;
+                }
+
+                const student = data.data;
+
+                const html = `
+                    <div class="result-card">
+                        <h3>Student Result 
+                            <span class="status-badge status-${student.status.toLowerCase()}">${student.status}</span>
+                        </h3>
+                        <p><strong>Roll Number:</strong> ${student.rollNumber}</p>
+                        <p><strong>Institute:</strong> ${student.instituteName}</p>
+                        <p><strong>Institute Code:</strong> ${student.instituteCode}</p>
+                        <p><strong>Semester:</strong> ${student.semester} (${student.regulation} Regulation)</p>
+                        
+                        <div class="gpa-grid">
+                            <div class="gpa-item">
+                                <div class="gpa-label">1st Sem</div>
+                                <div class="gpa-value">${formatGPA(student.gpaData.gpa1)}</div>
+                            </div>
+                            <div class="gpa-item">
+                                <div class="gpa-label">2nd Sem</div>
+                                <div class="gpa-value">${formatGPA(student.gpaData.gpa2)}</div>
+                            </div>
+                            <div class="gpa-item">
+                                <div class="gpa-label">3rd Sem</div>
+                                <div class="gpa-value">${formatGPA(student.gpaData.gpa3)}</div>
+                            </div>
+                            <div class="gpa-item">
+                                <div class="gpa-label">4th Sem</div>
+                                <div class="gpa-value">${formatGPA(student.gpaData.gpa4)}</div>
+                            </div>
+                            <div class="gpa-item">
+                                <div class="gpa-label">5th Sem</div>
+                                <div class="gpa-value">${formatGPA(student.gpaData.gpa5)}</div>
+                            </div>
+                            <div class="gpa-item">
+                                <div class="gpa-label">6th Sem</div>
+                                <div class="gpa-value">${formatGPA(student.gpaData.gpa6)}</div>
+                            </div>
+                            <div class="gpa-item">
+                                <div class="gpa-label">Average</div>
+                                <div class="gpa-value">${student.averageGpa || 'N/A'}</div>
+                            </div>
+                        </div>
+                        
+                        ${student.referredSubjects && student.referredSubjects.length > 0 ? `
+                            <div style="margin-top: 20px;">
+                                <strong>Referred Subjects:</strong><br>
+                                ${student.referredSubjects.map(sub =>
+                    `${sub.subjectCode} (${sub.subjectType})`
+                ).join(', ')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    
+                    <details>
+                        <summary style="cursor: pointer; padding: 10px; background: #f0f0f0; border-radius: 5px; margin-top: 10px;">
+                            📋 View Raw JSON
+                        </summary>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </details>
+                `;
+
+                document.getElementById('result').innerHTML = html;
+            } catch (error) {
+                showError('Failed to fetch data. Make sure the server is running on http://localhost:5000');
+            }
+        }
+
+        async function getTopPerformers() {
+            showLoading();
+
+            try {
+                const response = await fetch(`${API_BASE}/students/top-performers?limit=10`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showError(data.message);
+                    return;
+                }
+
+                const html = `
+                    <h2>🏆 Top 10 Performers</h2>
+                    ${data.data.map((student, index) => `
+                        <div class="result-card">
+                            <h3>#${index + 1} - ${student.rollNumber} 
+                                <span class="status-badge status-passed">${formatGPA(student.gpaData.gpa6)} GPA</span>
+                            </h3>
+                            <p><strong>Institute:</strong> ${student.instituteName}</p>
+                            <p><strong>Average GPA:</strong> ${student.averageGpa}</p>
+                        </div>
+                    `).join('')}
+                    
+                    <details>
+                        <summary style="cursor: pointer; padding: 10px; background: #f0f0f0; border-radius: 5px; margin-top: 10px;">
+                            📋 View Raw JSON
+                        </summary>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </details>
+                `;
+
+                document.getElementById('result').innerHTML = html;
+            } catch (error) {
+                showError('Failed to fetch data');
+            }
+        }
+
+        async function getStatistics() {
+            showLoading();
+
+            try {
+                const response = await fetch(`${API_BASE}/students/stats/overview`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showError(data.message);
+                    return;
+                }
+
+                const stats = data.data;
+
+                const html = `
+                    <h2>📊 Overall Statistics</h2>
+                    <div class="result-card">
+                        <div class="gpa-grid">
+                            <div class="gpa-item">
+                                <div class="gpa-label">Total Students</div>
+                                <div class="gpa-value">${stats.total}</div>
+                            </div>
+                            <div class="gpa-item">
+                                <div class="gpa-label">Passed</div>
+                                <div class="gpa-value" style="color: #10b981">${stats.passed}</div>
+                            </div>
+                            <div class="gpa-item">
+                                <div class="gpa-label">Referred</div>
+                                <div class="gpa-value" style="color: #f59e0b">${stats.referred}</div>
+                            </div>
+                            <div class="gpa-item">
+                                <div class="gpa-label">Pass %</div>
+                                <div class="gpa-value">${stats.passPercentage}%</div>
+                            </div>
+                            <div class="gpa-item">
+                                <div class="gpa-label">Average GPA</div>
+                                <div class="gpa-value">${stats.averageGpa}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <details>
+                        <summary style="cursor: pointer; padding: 10px; background: #f0f0f0; border-radius: 5px; margin-top: 10px;">
+                            📋 View Raw JSON
+                        </summary>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </details>
+                `;
+
+                document.getElementById('result').innerHTML = html;
+            } catch (error) {
+                showError('Failed to fetch data');
+            }
+        }
+
+        async function advancedSearch() {
+            showLoading();
+
+            const status = document.getElementById('status').value;
+            const minGpa = document.getElementById('minGpa').value;
+            const instituteCode = document.getElementById('instituteCode').value;
+
+            const params = new URLSearchParams();
+            if (status) params.append('status', status);
+            if (minGpa) params.append('minGpa', minGpa);
+            if (instituteCode) params.append('instituteCode', instituteCode);
+            params.append('limit', '10');
+
+            try {
+                const response = await fetch(`${API_BASE}/students/search?${params}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showError(data.message);
+                    return;
+                }
+
+                if (data.data.length === 0) {
+                    document.getElementById('result').innerHTML = '<div class="error">No results found</div>';
+                    return;
+                }
+
+                const html = `
+                    <h2>🔍 Search Results (${data.pagination.totalRecords} total)</h2>
+                    ${data.data.map(student => `
+                        <div class="result-card">
+                            <h3>${student.rollNumber} 
+                                <span class="status-badge status-${student.status.toLowerCase()}">${student.status}</span>
+                            </h3>
+                            <p><strong>Institute:</strong> ${student.instituteName}</p>
+                            <p><strong>6th Semester GPA:</strong> ${formatGPA(student.gpaData.gpa6)}</p>
+                        </div>
+                    `).join('')}
+                    
+                    <details>
+                        <summary style="cursor: pointer; padding: 10px; background: #f0f0f0; border-radius: 5px; margin-top: 10px;">
+                            📋 View Raw JSON
+                        </summary>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </details>
+                `;
+
+                document.getElementById('result').innerHTML = html;
+            } catch (error) {
+                showError('Failed to fetch data');
+            }
+        }
+
+        async function getAllInstitutes() {
+            showLoading();
+
+            try {
+                const response = await fetch(`${API_BASE}/institutes?limit=20`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showError(data.message);
+                    return;
+                }
+
+                const html = `
+                    <h2>🏫 All Institutes</h2>
+                    ${data.data.map(institute => `
+                        <div class="result-card">
+                            <h3>${institute.instituteName}</h3>
+                            <p><strong>Code:</strong> ${institute.instituteCode}</p>
+                            <p><strong>Location:</strong> ${institute.location || 'N/A'}</p>
+                            <p><strong>Total Students:</strong> ${institute.totalStudents}</p>
+                            <p><strong>Passed:</strong> ${institute.passedStudents}</p>
+                            <p><strong>Pass Rate:</strong> ${institute.passPercentage}%</p>
+                        </div>
+                    `).join('')}
+                    
+                    <details>
+                        <summary style="cursor: pointer; padding: 10px; background: #f0f0f0; border-radius: 5px; margin-top: 10px;">
+                            📋 View Raw JSON
+                        </summary>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    </details>
+                `;
+
+                document.getElementById('result').innerHTML = html;
+            } catch (error) {
+                showError('Failed to fetch data');
+            }
+        }
+
+        // Allow Enter key to search
+        document.getElementById('rollNumber').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') {
+                searchByRoll();
+            }
+        });
+    </script>
+</body>
+
+</html>
