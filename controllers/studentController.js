@@ -105,7 +105,8 @@ exports.determinePDFFileName = (semester, regulation) => {
         7: "7th",
         8: "8th",
     };
-    const semesterOrdinal = ordinals[sem] || `${sem}th`;
+    const semesterOrdinal = ordinals[sem];
+    console.log("🚀 ~ semesterOrdinal:", semesterOrdinal)
 
     return `RESULT_${semesterOrdinal}_${reg}_Regulation.pdf`;
 };
